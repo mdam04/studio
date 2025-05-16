@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback } from "react";
@@ -6,10 +7,11 @@ import { RepoUrlForm } from "@/components/test-generator/repo-url-form";
 import { FunctionalitySelector } from "@/components/test-generator/functionality-selector";
 import { TestPreviewPanel } from "@/components/test-generator/test-preview-panel";
 import { TestOutputConsole } from "@/components/test-generator/test-output-console";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { generateCypressTest, type GenerateCypressTestOutput } from "@/ai/flows/generate-cypress-test-flow";
 
 export default function Home() {
+  const [currentRepoUrl, setCurrentRepoUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [suggestedFunctionalities, setSuggestedFunctionalities] = useState<string[]>([]);
@@ -29,6 +31,7 @@ export default function Home() {
   const handleAnalysisStart = useCallback(() => {
     setIsAnalyzing(true);
     setAnalysisError(null);
+    setCurrentRepoUrl(null);
     setSuggestedFunctionalities([]);
     setSelectedFunctionality(null);
     setSelectedTestType(null);
@@ -37,10 +40,11 @@ export default function Home() {
     setTestResult(null);
   }, []);
 
-  const handleAnalysisComplete = useCallback((suggestions: string[]) => {
+  const handleAnalysisSuccess = useCallback((data: { suggestions: string[]; repoUrl: string }) => {
     setIsAnalyzing(false);
-    setSuggestedFunctionalities(suggestions);
-    if (suggestions.length === 0) {
+    setSuggestedFunctionalities(data.suggestions);
+    setCurrentRepoUrl(data.repoUrl);
+    if (data.suggestions.length === 0) {
       toast({
         title: "No Functionalities Found",
         description: "The AI could not identify specific functionalities to test.",
@@ -52,6 +56,7 @@ export default function Home() {
   const handleAnalysisError = useCallback((error: string) => {
     setIsAnalyzing(false);
     setAnalysisError(error);
+    setCurrentRepoUrl(null);
   }, []);
 
   const handleGenerateTest = useCallback(async () => {
@@ -59,30 +64,37 @@ export default function Home() {
       toast({ title: "Missing Selections", description: "Please select a functionality and test type.", variant: "destructive" });
       return;
     }
-    setIsGeneratingTest(true);
-    setGeneratedTestCode(""); // Clear previous
-    // Simulate AI test generation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    const mockCode = `// Cypress ${selectedTestType} test for "${selectedFunctionality}"
-describe('${selectedFunctionality}', () => {
-  beforeEach(() => {
-    // Mock API calls or setup state
-    cy.intercept('/api/data', { fixture: 'data.json' }).as('getData');
-    ${selectedTestType === 'component' ? `// cy.mount(<MyComponent />);` : `cy.visit('/${selectedFunctionality.toLowerCase().replace(/\s+/g, '-')}');`}
-  });
+    if (!currentRepoUrl) {
+      toast({ title: "Repository Not Analyzed", description: "Please analyze a repository first.", variant: "destructive" });
+      return;
+    }
 
-  it('should perform a key action related to ${selectedFunctionality}', () => {
-    // Example assertion
-    cy.get('[data-cy="submit-button"]').should('be.visible');
-    cy.get('[data-cy="input-field"]').type('Test input');
-    cy.get('[data-cy="submit-button"]').click();
-    cy.contains('Success').should('be.visible');
-  });
-});`;
-    setGeneratedTestCode(mockCode);
-    setIsGeneratingTest(false);
-    toast({ title: "Test Code Generated", description: "Mock test code has been populated." });
-  }, [selectedFunctionality, selectedTestType, toast]);
+    setIsGeneratingTest(true);
+    setGeneratedTestCode(""); 
+    
+    try {
+      const result: GenerateCypressTestOutput = await generateCypressTest({
+        repoUrl: currentRepoUrl,
+        functionalityDescription: selectedFunctionality,
+        testType: selectedTestType,
+      });
+
+      if (result && result.generatedTestCode) {
+        setGeneratedTestCode(result.generatedTestCode);
+        toast({ title: "Test Code Generated", description: "AI has generated the test code." });
+      } else {
+        setGeneratedTestCode("// AI failed to generate test code. Please try again.");
+        toast({ title: "Generation Failed", description: "AI could not generate test code.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error generating test code:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during test generation.";
+      setGeneratedTestCode(`// Error generating test code: ${errorMessage}`);
+      toast({ title: "Generation Error", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsGeneratingTest(false);
+    }
+  }, [selectedFunctionality, selectedTestType, currentRepoUrl, toast]);
 
   const handleRunTest = useCallback(async () => {
     if (!generatedTestCode) {
@@ -91,36 +103,36 @@ describe('${selectedFunctionality}', () => {
     }
     setIsTestRunning(true);
     setTestResult("running");
-    setTestLogs(["Starting test execution..."]);
+    setTestLogs(["Starting test execution (simulation)..."]);
 
     // Simulate test execution and log streaming
     const mockLogs = [
       `Executing: ${selectedFunctionality || 'Test'} (${selectedTestType || 'N/A'})`,
-      "Cypress version: 12.0.0",
-      "Browser: Electron (headless)",
+      "Cypress version: 12.0.0 (simulated)",
+      "Browser: Electron (headless, simulated)",
       "Specs: 1 found (generated_test.cy.js)",
-      "Running: generated_test.cy.js",
-      "  ✓ Test for " + selectedFunctionality + " (500ms)",
-      "All specs passed!"
+      "Running: generated_test.cy.js (simulated)",
+      "  ✓ Test for " + selectedFunctionality + " (500ms, simulated)",
+      "All specs passed! (simulated)"
     ];
     
     for (let i = 0; i < mockLogs.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300)); // Faster simulation
       setTestLogs(prev => [...prev, mockLogs[i]]);
     }
 
     const randomPass = Math.random() > 0.3; // 70% chance of passing
     setTestResult(randomPass ? "pass" : "fail");
-    setTestLogs(prev => [...prev, `Test ${randomPass ? "Passed" : "Failed"}`]);
+    setTestLogs(prev => [...prev, `Test ${randomPass ? "Passed" : "Failed"} (simulated)`]);
     setIsTestRunning(false);
-    toast({ title: "Test Execution Finished", description: `Test ${randomPass ? "passed" : "failed"}.` });
+    toast({ title: "Test Execution Finished", description: `Simulated test ${randomPass ? "passed" : "failed"}.` });
   }, [generatedTestCode, selectedFunctionality, selectedTestType, toast]);
 
   const sidebar = (
     <div className="space-y-6">
       <RepoUrlForm 
         onAnalysisStart={handleAnalysisStart}
-        onAnalysisComplete={handleAnalysisComplete}
+        onAnalysisSuccess={handleAnalysisSuccess}
         onAnalysisError={handleAnalysisError}
       />
       <FunctionalitySelector
@@ -130,7 +142,7 @@ describe('${selectedFunctionality}', () => {
         selectedTestType={selectedTestType}
         onTestTypeChange={setSelectedTestType}
         isLoading={isAnalyzing}
-        disabled={suggestedFunctionalities.length === 0 && !isAnalyzing}
+        disabled={(suggestedFunctionalities.length === 0 && !isAnalyzing) || !currentRepoUrl}
       />
     </div>
   );
@@ -145,7 +157,7 @@ describe('${selectedFunctionality}', () => {
             onRunTest={handleRunTest}
             isGenerating={isGeneratingTest}
             isTestRunning={isTestRunning}
-            canGenerate={!!selectedFunctionality && !!selectedTestType}
+            canGenerate={!!selectedFunctionality && !!selectedTestType && !!currentRepoUrl}
             canRun={!!generatedTestCode}
           />
         </div>

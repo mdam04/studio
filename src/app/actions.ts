@@ -1,3 +1,4 @@
+
 // src/app/actions.ts
 "use server";
 
@@ -11,6 +12,7 @@ const AnalyzeRepoSchema = z.object({
 
 export interface AnalyzeRepoState {
   suggestions?: string[];
+  repoUrl?: string; // Added repoUrl
   error?: string;
   success: boolean;
 }
@@ -36,12 +38,21 @@ export async function analyzeRepositoryAction(
     });
     
     if (result && result.testSuggestions) {
-      return { suggestions: result.testSuggestions, success: true };
+      return { 
+        suggestions: result.testSuggestions, 
+        repoUrl: validatedFields.data.repoUrl, // Return repoUrl on success
+        success: true 
+      };
     } else {
       return { error: "No suggestions received from AI.", success: false };
     }
   } catch (error) {
     console.error("Error analyzing repository:", error);
-    return { error: "Failed to analyze repository. Please check the URL or try again later.", success: false };
+    // Check if error is an instance of Error to access message property
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { 
+        error: `Failed to analyze repository: ${errorMessage}. Please check the URL or try again later.`, 
+        success: false 
+    };
   }
 }

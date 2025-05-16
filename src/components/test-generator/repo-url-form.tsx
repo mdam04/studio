@@ -2,8 +2,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useFormState, useFormStatus } from "react-dom"; // Keep useFormStatus from react-dom
-import { useActionState } from "react"; // Import useActionState from react
+import { useFormStatus } from "react-dom"; 
+import { useActionState } from "react"; 
 import { Github, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { analyzeRepositoryAction, type AnalyzeRepoState } from "@/app/actions";
 import { useToast } from "@/hooks/use-toast";
 
 interface RepoUrlFormProps {
-  onAnalysisComplete: (suggestions: string[]) => void;
+  onAnalysisSuccess: (data: { suggestions: string[]; repoUrl: string }) => void;
   onAnalysisStart: () => void;
   onAnalysisError: (error: string) => void;
 }
@@ -32,13 +32,13 @@ function SubmitButton() {
   );
 }
 
-export function RepoUrlForm({ onAnalysisComplete, onAnalysisStart, onAnalysisError }: RepoUrlFormProps) {
-  const [state, formAction] = useActionState(analyzeRepositoryAction, initialState); // Changed to useActionState
+export function RepoUrlForm({ onAnalysisSuccess, onAnalysisStart, onAnalysisError }: RepoUrlFormProps) {
+  const [state, formAction] = useActionState(analyzeRepositoryAction, initialState);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (state.success && state.suggestions) {
-      onAnalysisComplete(state.suggestions);
+    if (state.success && state.suggestions && state.repoUrl) {
+      onAnalysisSuccess({ suggestions: state.suggestions, repoUrl: state.repoUrl });
       toast({
         title: "Analysis Complete",
         description: `${state.suggestions.length} functionalities suggested.`,
@@ -51,7 +51,7 @@ export function RepoUrlForm({ onAnalysisComplete, onAnalysisStart, onAnalysisErr
         variant: "destructive",
       });
     }
-  }, [state, onAnalysisComplete, onAnalysisError, toast]);
+  }, [state, onAnalysisSuccess, onAnalysisError, toast]);
 
   const handleFormAction = (formData: FormData) => {
     onAnalysisStart();
