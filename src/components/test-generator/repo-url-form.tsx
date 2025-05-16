@@ -1,7 +1,9 @@
+
 "use client";
 
 import { useEffect } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormState, useFormStatus } from "react-dom"; // Keep useFormStatus from react-dom
+import { useActionState } from "react"; // Import useActionState from react
 import { Github, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +33,7 @@ function SubmitButton() {
 }
 
 export function RepoUrlForm({ onAnalysisComplete, onAnalysisStart, onAnalysisError }: RepoUrlFormProps) {
-  const [state, formAction] = useFormState(analyzeRepositoryAction, initialState);
+  const [state, formAction] = useActionState(analyzeRepositoryAction, initialState); // Changed to useActionState
   const { toast } = useToast();
 
   useEffect(() => {
